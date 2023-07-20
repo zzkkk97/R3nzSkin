@@ -7,7 +7,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-2023]
+        os: [windows-2022]
         configuration: [ChinaServer]
     steps:
     - uses: actions/checkout@v2
