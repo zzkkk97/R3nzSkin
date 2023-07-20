@@ -20,4 +20,4 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: windows
-        path: D:\a\R3nzSkin\R3nzSkin\R3nzSkin\Release\ChinaServer\hid.dll
+        path: D:\a\R3nzSkin\R3nzSkin\R3nzSkin\Release\ChinaServer\R3nzSkin.dll
