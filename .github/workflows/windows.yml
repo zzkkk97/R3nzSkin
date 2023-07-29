@@ -53,19 +53,17 @@ jobs:
           release_name: Release ${{ steps.random_version.outputs.random_version }}
           draft: false
           prerelease: false
-        env:
-          MY_GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
+          token: ${{ secrets.MY_GITHUB_TOKEN }}
 
       # 步骤5：上传发布资产
       - name: 上传发布资产
         uses: actions/upload-release-asset@v1
-        env:
-          MY_GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ github.workspace }}/D:\a\R3nzSkin\R3nzSkin\R3nzSkin\Release\ChinaServer\R3nzSkin.dll
+          asset_path: ${{ github.workspace }}/windows/R3nzSkin.dll
           asset_name: R3nzSkin.dll
           asset_content_type: application/octet-stream
+          token: ${{ secrets.MY_GITHUB_TOKEN }}
 
       # 步骤6：删除之前的发布
       - name: 删除之前的发布
