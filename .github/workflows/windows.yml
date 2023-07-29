@@ -1,12 +1,10 @@
 name: Windows
 
-on: 
+on:
   push:
-    paths:
-      - 'R3nzSkin/**'  # 只有修改了 R3nzSkin 目录及其子目录下的文件时才触发编译
+    # 不再设置 paths，编译将在任何文件修改时触发
   pull_request:
-    paths:
-      - 'R3nzSkin/**'  # 只有修改了 R3nzSkin 目录及其子目录下的文件时才触发编译
+    # 不再设置 paths，编译将在任何文件修改时触发
 
 jobs:
   build:
@@ -18,15 +16,12 @@ jobs:
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v2
-        with:
-          path: R3nzSkin
 
       - name: Add msbuild to PATH
         uses: microsoft/setup-msbuild@v1.1
 
       - name: Build
-        working-directory: R3nzSkin
-        run: msbuild R3nzSkin.vcxproj /p:Platform=x64 /p:Configuration=${{ matrix.configuration }}
+        run: msbuild R3nzSkin/R3nzSkin.vcxproj /p:Platform=x64 /p:Configuration=${{ matrix.configuration }}
 
       - name: Upload File
         uses: actions/upload-artifact@v2
