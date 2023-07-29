@@ -32,7 +32,6 @@ jobs:
   publish:
     needs: build
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'release' }}  # 仅在发布 Release 时运行该任务
     steps:
       - name: Download Artifact
         uses: actions/download-artifact@v2
