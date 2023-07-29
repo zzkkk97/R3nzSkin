@@ -1,33 +1,81 @@
 name: Windows
 
-on: [push, pull_request]
+on:
+  push:
+    # 不再设置 paths，编译将在任何文件修改时触发
+  pull_request:
+    # 不再设置 paths，编译将在任何文件修改时触发
 
 jobs:
-  publish:
-    runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[ci skip]') == false && contains(github.event_path, 'README.md') }}
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-2022]
+        configuration: [ChinaServer]
     steps:
-      - name: Download README.md
-        run: |
-          echo "Downloading README.md from the root directory..."
-          curl -o README.md -L ${{ github.event.repository.url }}/raw/main/README.md
+      - name: Checkout Repo
+        uses: actions/checkout@v2
+        # 步骤1：从 GitHub 仓库中检出代码到工作目录
+
+      - name: Add msbuild to PATH
+        uses: microsoft/setup-msbuild@v1.1
+        # 步骤2：配置构建环境，将 msbuild 添加到 PATH 中
+
+      - name: Build
+        run: msbuild R3nzSkin/R3nzSkin.vcxproj /p:Platform=x64 /p:Configuration=${{ matrix.configuration }}
+        # 步骤3：执行编译命令，构建项目
+
+      - name: Upload File
+        uses: actions/upload-artifact@v2
+        with:
+          name: windows
+          path: R3nzSkin/Release/ChinaServer/R3nzSkin.dll
+        # 步骤4：将编译生成的 R3nzSkin.dll 文件上传为构建产物
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: windows
+        # 步骤5：下载构建产物 R3nzSkin.dll
+
+      - name: Generate Random Version Number
+        id: random_version
+        run: echo "::set-output name=random_version::$(openssl rand -hex 4 | tr -d '\n')"
+        # 步骤6：生成随机版本号，保存为输出参数 random_version
+
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.sha }}
-          release_name: Release ${{ github.sha }}
+          tag_name: ${{ steps.random_version.outputs.random_version }}
+          release_name: Release ${{ steps.random_version.outputs.random_version }}
           draft: false
           prerelease: false
+        # 步骤7：创建新的发布，使用随机版本号作为标签和发布名称
 
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./README.md
-          asset_name: README.md
-          asset_content_type: text/plain
+          asset_path: ./R3nzSkin.dll
+          asset_name: R3nzSkin.dll
+          asset_content_type: application/octet-stream
+        # 步骤8：将编译生成的 R3nzSkin.dll 文件上传到发布中作为资产
+
+      - name: Delete Previous Releases
+        run: |
+          releases=$(curl -s -H "Authorization: token ${{ secrets.MY_GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases)
+          for release in $(echo "${releases}" | jq -r '.[].id'); do
+            echo "Deleting release ID: ${release}"
+            curl -X DELETE -H "Authorization: token ${{ secrets.MY_GITHUB_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/releases/${release}"
+          done
+        # 步骤9：删除之前的全部发布，只保留最新的发布
