@@ -21,7 +21,6 @@ jobs:
     - name: Add msbuild to PATH
       uses: microsoft/setup-msbuild@v1.1
     - name: Build
-      id: build
       shell: cmd
       run: msbuild R3nzSkin/R3nzSkin.vcxproj /p:Platform=x64 /p:Configuration=${{ matrix.configuration }}
     - name: Upload File
@@ -29,13 +28,11 @@ jobs:
       with:
         name: windows
         path: D:\a\R3nzSkin\R3nzSkin\R3nzSkin\Release\ChinaServer\R3nzSkin.dll
-      # 提供生成的 R3nzSkin.dll 文件的路径作为输出
-      # 这样后续的发布步骤可以使用这个路径来上传资产
-      # ${{ steps.upload_file.outputs.artifact_path }} 表示提取上一步输出的路径
-      id: upload_file
-      env:
-        ARTIFACT_PATH: D:\a\R3nzSkin\R3nzSkin\R3nzSkin\Release\ChinaServer\R3nzSkin.dll
-      run: echo "artifact_path=${ARTIFACT_PATH}" >> $GITHUB_ENV
+
+    # Set the artifact path as an environment variable
+    - name: Set Artifact Path
+      id: set_artifact_path
+      run: echo "ARTIFACT_PATH=D:\\a\\R3nzSkin\\R3nzSkin\\R3nzSkin\\Release\\ChinaServer\\R3nzSkin.dll" >> $GITHUB_ENV
 
   publish:
     needs: build
@@ -72,7 +69,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        # 使用 build 步骤输出的路径作为上传的文件路径
-        asset_path: ${{ steps.upload_file.outputs.artifact_path }}
+        asset_path: ${{ env.ARTIFACT_PATH }}
         asset_name: R3nzSkin.dll
         asset_content_type: application/octet-stream
