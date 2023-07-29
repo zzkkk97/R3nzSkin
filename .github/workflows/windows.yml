@@ -2,14 +2,15 @@ name: Windows
 
 on:
   push:
+    branches:
+      - main
   pull_request:
-    # 添加“types”过滤器以仅在来自fork的PR上触发工作流程
     types: [opened, synchronize, reopened, closed, pull_request_target]
+  release:
+    types: [published]
 
 jobs:
   build:
-    # 使用“if”语句来阻止此任务在发布创建触发时运行
-    if: ${{ github.event_name != 'release' }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -22,17 +23,16 @@ jobs:
       - name: Build
         shell: cmd
         run: msbuild R3nzSkin/R3nzSkin.vcxproj /p:Platform=x64 /p:Configuration=${{ matrix.configuration }}
-      # 添加if条件，仅当不是发布事件时才上传构建产物
       - name: Upload File
-        if: ${{ github.event_name != 'release' }}
         uses: actions/upload-artifact@v2
         with:
           name: windows
           path: D:\a\R3nzSkin\R3nzSkin\R3nzSkin\Release\ChinaServer\R3nzSkin.dll
 
   publish:
-    needs: build  # 等待 build 任务完成后再执行 publish 任务
+    needs: build
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'release' }}  # 仅在发布 Release 时运行该任务
     steps:
       - name: Download Artifact
         uses: actions/download-artifact@v2
@@ -68,6 +68,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./R3nzSkin.dll  # 设置要上传的文件路径，根据之前 build 任务生成的文件路径自行调整
-          asset_name: R3nzSkin.dll  # 设置上传后的文件名，根据你的需要自行调整
+          asset_path: ./R3nzSkin.dll
+          asset_name: R3nzSkin.dll
           asset_content_type: application/octet-stream
