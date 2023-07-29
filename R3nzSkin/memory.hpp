@@ -24,7 +24,7 @@ public:
 	std::int32_t additional;
 	std::uint64_t* offset;
 };
-
+// 1
 class Memory {
 public:
 	void Search(bool gameClient = true);
