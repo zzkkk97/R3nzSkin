@@ -96,3 +96,4 @@ public:
 		{ FNV("Ezreal"), 5, 5, { "Level 1", "Level 2", "Level 3" } }
 	};
 };
+
