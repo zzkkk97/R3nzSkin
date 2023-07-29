@@ -36,13 +36,35 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: windows
+
       - name: Get Current Version
         id: get_version
         run: echo "::set-output name=version::$(cat version.txt)"
 
       - name: Bump Version
         id: bump_version
-        run: echo "::set-output name=next_version::$(cat version.txt | awk -F. -v OFS=. '{$NF++;print}')"
+        run: |
+          # 读取当前版本号
+          current_version=$(cat version.txt)
+
+          # 将版本号按照 'x.y.z' 格式分割为数组
+          IFS='.' read -ra version_parts <<< "$current_version"
+
+          # 递增修订号
+          ((version_parts[2]++))
+
+          # 拼接递增后的版本号
+          next_version="${version_parts[0]}.${version_parts[1]}.${version_parts[2]}"
+
+          # 将递增后的版本号写入 version.txt 文件
+          echo "$next_version" > version.txt
+
+          # 输出递增后的版本号
+          echo "Next version: $next_version"
+
+          # 设置输出变量，以便在后续步骤中使用
+          echo "::set-output name=next_version::$next_version"
+
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -53,6 +75,7 @@ jobs:
           release_name: Release v${{ steps.bump_version.outputs.next_version }}
           draft: false
           prerelease: false
+
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
         env:
