@@ -2,9 +2,14 @@ name: Windows
 
 on:
   push:
-    # 不再设置 paths，编译将在任何文件修改时触发
+    # 只在 main 分支上触发工作流程
+    branches:
+      - main
+    # 限制只有在根目录下的 R3nzSkin/memory.hpp 文件发生变化时触发工作流程
+    paths:
+      - 'R3nzSkin/memory.hpp'
   pull_request:
-    # 不再设置 paths，编译将在任何文件修改时触发
+    types: [opened, synchronize, reopened, closed, pull_request_target]
 
 jobs:
   build:
@@ -16,22 +21,18 @@ jobs:
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v2
-        # 步骤1：从 GitHub 仓库中检出代码到工作目录
 
       - name: Add msbuild to PATH
         uses: microsoft/setup-msbuild@v1.1
-        # 步骤2：配置构建环境，将 msbuild 添加到 PATH 中
 
       - name: Build
         run: msbuild R3nzSkin/R3nzSkin.vcxproj /p:Platform=x64 /p:Configuration=${{ matrix.configuration }}
-        # 步骤3：执行编译命令，构建项目
 
       - name: Upload File
         uses: actions/upload-artifact@v2
         with:
           name: windows
           path: R3nzSkin/Release/ChinaServer/R3nzSkin.dll
-        # 步骤4：将编译生成的 R3nzSkin.dll 文件上传为构建产物
 
   publish:
     needs: build
@@ -44,18 +45,15 @@ jobs:
             echo "Deleting release ID: ${release}"
             curl -X DELETE -H "Authorization: token ${{ secrets.MY_GITHUB_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/releases/${release}"
           done
-        # 步骤5：删除之前的全部发布，只保留最新的发布
 
       - name: Download Artifact
         uses: actions/download-artifact@v2
         with:
           name: windows
-        # 步骤6：下载构建产物 R3nzSkin.dll
 
       - name: Generate Random Version Number
         id: random_version
         run: echo "::set-output name=random_version::$(openssl rand -hex 4 | tr -d '\n')"
-        # 步骤7：生成随机版本号，保存为输出参数 random_version
 
       - name: Create Release
         id: create_release
@@ -67,7 +65,6 @@ jobs:
           release_name: Release ${{ steps.random_version.outputs.random_version }}
           draft: false
           prerelease: false
-        # 步骤8：创建新的发布，使用随机版本号作为标签和发布名称
 
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
@@ -78,4 +75,3 @@ jobs:
           asset_path: ./R3nzSkin.dll
           asset_name: R3nzSkin.dll
           asset_content_type: application/octet-stream
-        # 步骤9：将编译生成的 R3nzSkin.dll 文件上传到发布中作为资产
