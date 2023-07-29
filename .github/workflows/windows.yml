@@ -1,59 +1,42 @@
 name: Windows
 
-on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+on: [push, pull_request]
 
 jobs:
   build:
-    runs-on: windows-2022
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-2022]
+        configuration: [ChinaServer]
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v2
-
-      - name: Setup MSBuild
+      - uses: actions/checkout@v2
+      - name: Add msbuild to PATH
         uses: microsoft/setup-msbuild@v1.1
-
-      - name: Build Project
+      - name: Build
         shell: cmd
-        run: msbuild R3nzSkin/R3nzSkin.vcxproj /p:Platform=x64 /p:Configuration=ChinaServer
-
-      - name: Upload Artifact
+        run: msbuild R3nzSkin/R3nzSkin.vcxproj /p:Platform=x64 /p:Configuration=${{ matrix.configuration }}
+      - name: Upload File
         uses: actions/upload-artifact@v2
         with:
           name: windows
-          path: R3nzSkin/R3nzSkin/Release/ChinaServer/R3nzSkin.dll
+          path: D:\a\R3nzSkin\R3nzSkin\R3nzSkin\Release\ChinaServer\R3nzSkin.dll
 
   publish:
-    needs: build
+    needs: build  # 等待 build 任务完成后再执行 publish 任务
     runs-on: ubuntu-latest
     steps:
       - name: Download Artifact
         uses: actions/download-artifact@v2
         with:
           name: windows
-          path: R3nzSkin/R3nzSkin/Release/ChinaServer/
-
-      - name: Set up Git
-        run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-
       - name: Get Latest Release Tag
         id: get_latest_tag
         run: echo "::set-output name=tag::$(git describe --tags $(git rev-list --tags --max-count=1))"
 
-      - name: Output Next Version
-        run: echo "Next Version: ${{ steps.get_latest_tag.outputs.tag }}"
-
       - name: Bump Version
         id: bump_version
         run: echo "::set-output name=next_version::$(echo "${{ steps.get_latest_tag.outputs.tag }}" | awk -F. -v OFS=. '{$NF++;print}')"
-
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -64,13 +47,12 @@ jobs:
           release_name: Release ${{ steps.bump_version.outputs.next_version }}
           draft: false
           prerelease: false
-
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./R3nzSkin/R3nzSkin/Release/ChinaServer/R3nzSkin.dll
-          asset_name: R3nzSkin.dll
+          asset_path: ./R3nzSkin.dll  # 设置要上传的文件路径，根据之前 build 任务生成的文件路径自行调整
+          asset_name: R3nzSkin.dll  # 设置上传后的文件名，根据你的需要自行调整
           asset_content_type: application/octet-stream
