@@ -3,87 +3,62 @@ name: Windows
 on:
   push:
     branches:
-      - main # 将此处更改为你的主分支名称（如果不是 main 的话）
+      - main
   pull_request:
+    branches:
+      - main
 
 jobs:
-  build_and_publish:
+  build:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [windows-2022]
         configuration: [ChinaServer]
     steps:
-      - uses: actions/checkout@v2 # 使用 GitHub Actions 的 checkout 操作，用于检出仓库代码
-
+      - uses: actions/checkout@v2
       - name: Add msbuild to PATH
-        uses: microsoft/setup-msbuild@v1.1 # 使用 Microsoft 提供的 Action 来安装 msbuild
-
+        uses: microsoft/setup-msbuild@v1.1
       - name: Build
         shell: cmd
-        run: msbuild R3nzSkin/R3nzSkin.vcxproj /p:Platform=x64 /p:Configuration=${{ matrix.configuration }} # 使用 msbuild 编译你的项目
-
-      - name: Get current version
-        id: get_version
-        run: |
-          # 使用 PowerShell 脚本读取当前版本号，并将其存储在输出变量 'version' 中
-          $version = (Get-Content -Path YourProjectFile.xml | Select-String -Pattern "<Version>(.*?)</Version>").Matches.Groups[1].Value
-          Write-Host "Current version: $version"
-          echo "::set-output name=version::$version"
-
-      - name: Increment version
-        id: increment_version
-        run: |
-          # 使用 PowerShell 脚本自动增加版本号
-          $version = "${{ env.VERSION }}"
-          $major = $version.Split('.')[0]
-          $minor = $version.Split('.')[1]
-          $patch = $version.Split('.')[2]
-          $new_patch = $patch + 1
-          $new_version = "$major.$minor.$new_patch"
-          Write-Host "New version: $new_version"
-          echo "::set-output name=new_version::$new_version"
-
-      - name: Update project file with new version
-        run: |
-          # 使用 PowerShell 脚本将新版本号更新到项目文件中
-          $new_version = "${{ env.NEW_VERSION }}"
-          (Get-Content -Path YourProjectFile.xml) -replace "<Version>(.*?)</Version>", "<Version>$new_version</Version>" | Set-Content -Path YourProjectFile.xml
-
-      - name: Commit changes
-        run: |
-          # 提交带有新版本号的项目文件更改
-          # 确保使用 'git config' 正确配置 GitHub 用户和电子邮件。
-          git add YourProjectFile.xml
-          git commit -m "版本号更新至 ${{ env.NEW_VERSION }}"
-
-      - name: Push changes
-        uses: ad-m/github-push-action@master
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }} # 使用 MY_GITHUB_TOKEN 授权以推送代码
-
-      - name: Create release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # 使用 MY_GITHUB_TOKEN 授权以创建发布
-
-        with:
-          tag_name: ${{ steps.increment_version.outputs.new_version }}
-          release_name: Release ${{ steps.increment_version.outputs.new_version }}
-          draft: false
-          prerelease: false
-
+        run: msbuild R3nzSkin/R3nzSkin.vcxproj /p:Platform=x64 /p:Configuration=${{ matrix.configuration }}
       - name: Upload File
         uses: actions/upload-artifact@v2
         with:
           name: windows
-          path: D:\a\R3nzSkin\R3nzSkin\R3nzSkin\Release\ChinaServer\R3nzSkin.dll # 上传编译好的文件作为 Artifact
+          path: D:\a\R3nzSkin\R3nzSkin\R3nzSkin\Release\ChinaServer\R3nzSkin.dll
 
-      - name: Publish Release
-        id: publish_release
-        uses: softprops/action-gh-release@v1
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Artifact
+        uses: actions/download-artifact@v2
         with:
-          files: D:\a\R3nzSkin\R3nzSkin\R3nzSkin\Release\ChinaServer\R3nzSkin.dll # 发布文件
+          name: windows
+      - name: Get Current Version
+        id: get_version
+        run: echo "::set-output name=version::$(cat version.txt)"
+
+      - name: Bump Version
+        id: bump_version
+        run: echo "::set-output name=next_version::$(cat version.txt | awk -F. -v OFS=. '{$NF++;print}')"
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # 使用 MY_GITHUB_TOKEN 授权以发布 Release
+          GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.bump_version.outputs.next_version }}
+          release_name: Release v${{ steps.bump_version.outputs.next_version }}
+          draft: false
+          prerelease: false
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./R3nzSkin.dll
+          asset_name: R3nzSkin.dll
+          asset_content_type: application/octet-stream
