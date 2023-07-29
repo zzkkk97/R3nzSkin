@@ -37,6 +37,9 @@ jobs:
         with:
           name: windows
 
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
       - name: Get Current Version
         id: get_version
         run: echo "::set-output name=version::$(cat version.txt)"
