@@ -2,8 +2,6 @@ name: Windows
 
 on:
   push:
-    branches:
-      - main  # 仅在 main 分支上触发工作流程
     paths:
       - '/'  # 匹配根目录及其所有内容
   pull_request:
