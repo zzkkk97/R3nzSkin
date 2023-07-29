@@ -1,12 +1,6 @@
 name: Windows
 
-on:
-  push:
-    branches:
-      - main  # 仅在 main 分支上触发工作流程
-
-  pull_request:
-    types: [opened, synchronize, reopened, closed, pull_request_target]
+on: [push, pull_request]
 
 jobs:
   build:
@@ -16,57 +10,18 @@ jobs:
         os: [windows-2022]
         configuration: [ChinaServer]
     steps:
-      - uses: actions/checkout@v2
-      - name: Add msbuild to PATH
-        uses: microsoft/setup-msbuild@v1.1
-      - name: Build
-        shell: cmd
-        run: msbuild R3nzSkin/R3nzSkin.vcxproj /p:Platform=x64 /p:Configuration=${{ matrix.configuration }}
-      - name: Upload File
-        uses: actions/upload-artifact@v2
-        with:
-          name: windows
-          path: D:\a\R3nzSkin\R3nzSkin\R3nzSkin\Release\ChinaServer\R3nzSkin.dll
+    - uses: actions/checkout@v2
+    - name: Add msbuild to PATH
+      uses: microsoft/setup-msbuild@v1.1
+    - name: Build
+      if: ${{ startsWith(github.event_name, 'push') && startsWith(github.path, 'R3nzSkin/') }}
+      shell: cmd
+      run: msbuild R3nzSkin/R3nzSkin.vcxproj /p:Platform=x64 /p:Configuration=${{ matrix.configuration }}
+    - name: Upload File
+      if: ${{ startsWith(github.event_name, 'push') && startsWith(github.path, 'R3nzSkin/') }}
+      uses: actions/upload-artifact@v2
+      with:
+        name: windows
+        path: D:\a\R3nzSkin\R3nzSkin\R3nzSkin\Release\ChinaServer\R3nzSkin.dll
 
-  publish:
-    needs: build
-    runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'release' }}  # 仅在发布 Release 时运行该任务
-    steps:
-      - name: Download Artifact
-        uses: actions/download-artifact@v2
-        with:
-          name: windows
-
-      - name: 获取最新发布标签
-        id: get_latest_tag
-        run: echo "::set-output name=tag::$(git describe --tags $(git rev-list --tags --max-count=1))"
-
-      - name: 更新版本号
-        id: bump_version
-        run: echo "::set-output name=next_version::$(echo "${{ steps.get_latest_tag.outputs.tag }}" | awk -F. -v OFS=. '{$NF++;print}')"
-
-      - name: 生成随机版本号
-        id: random_version
-        run: echo "::set-output name=random_version::$(date +%s | sha256sum | base64 | head -c 8 ; echo)"
-
-      - name: 创建发布
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ steps.random_version.outputs.random_version }}
-          release_name: Release ${{ steps.random_version.outputs.random_version }}
-          draft: false
-          prerelease: false
-
-      - name: 上传发布资产
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./R3nzSkin.dll
-          asset_name: R3nzSkin.dll
-          asset_content_type: application/octet-stream
+  # 其他任务...
