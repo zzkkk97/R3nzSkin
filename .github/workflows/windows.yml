@@ -4,18 +4,14 @@ on: [push, pull_request]
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [windows-2022]
-        configuration: [ChinaServer]
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v2
       - name: Add msbuild to PATH
         uses: microsoft/setup-msbuild@v1.1
       - name: Build
         shell: cmd
-        run: msbuild R3nzSkin/R3nzSkin.vcxproj /p:Platform=x64 /p:Configuration=${{ matrix.configuration }}
+        run: msbuild R3nzSkin/R3nzSkin.vcxproj /p:Platform=x64 /p:Configuration=ChinaServer
       - name: Upload File
         uses: actions/upload-artifact@v2
         with:
@@ -23,9 +19,12 @@ jobs:
           path: D:\a\R3nzSkin\R3nzSkin\R3nzSkin\Release\ChinaServer\R3nzSkin.dll
 
   publish:
-    needs: build  # 等待 build 任务完成后再执行 publish 任务
+    needs: build
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
       - name: Download Artifact
         uses: actions/download-artifact@v2
         with:
