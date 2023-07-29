@@ -4,14 +4,18 @@ on: [push, pull_request]
 
 jobs:
   build:
-    runs-on: windows-2022
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-2022]
+        configuration: [ChinaServer]
     steps:
       - uses: actions/checkout@v2
       - name: Add msbuild to PATH
         uses: microsoft/setup-msbuild@v1.1
       - name: Build
         shell: cmd
-        run: msbuild R3nzSkin/R3nzSkin.vcxproj /p:Platform=x64 /p:Configuration=ChinaServer
+        run: msbuild R3nzSkin/R3nzSkin.vcxproj /p:Platform=x64 /p:Configuration=${{ matrix.configuration }}
       - name: Upload File
         uses: actions/upload-artifact@v2
         with:
@@ -19,12 +23,9 @@ jobs:
           path: D:\a\R3nzSkin\R3nzSkin\R3nzSkin\Release\ChinaServer\R3nzSkin.dll
 
   publish:
-    needs: build
+    needs: build  # 等待 build 任务完成后再执行 publish 任务
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
       - name: Download Artifact
         uses: actions/download-artifact@v2
         with:
@@ -35,21 +36,7 @@ jobs:
 
       - name: Bump Version
         id: bump_version
-        run: |
-          # 获取最新的 Release 标签
-          latest_tag=$(git describe --tags $(git rev-list --tags --max-count=1))
-          # 提取版本号
-          version=${latest_tag#v}  # 去除前缀 'v' 得到版本号
-          # 解析版本号中的主版本号、次版本号和修订版本号
-          major=$(echo "$version" | cut -d "." -f 1)
-          minor=$(echo "$version" | cut -d "." -f 2)
-          patch=$(echo "$version" | cut -d "." -f 3)
-          # 每次更新将修订版本号加上 1
-          patch=$((patch + 1))
-          # 生成新版本号并输出
-          new_version="r3 v${major}.${minor}.${patch}"
-          echo "::set-output name=next_version::$new_version"
-
+        run: echo "::set-output name=next_version::$(echo "${{ steps.get_latest_tag.outputs.tag }}" | awk -F. -v OFS=. '{$NF++;print}')"
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -57,10 +44,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
         with:
           tag_name: ${{ steps.bump_version.outputs.next_version }}
-          release_name: R3 ${{ steps.bump_version.outputs.next_version }}  # 发布名称：R3 版本号
+          release_name: Release ${{ steps.bump_version.outputs.next_version }}
           draft: false
           prerelease: false
-
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
         env:
