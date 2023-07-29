@@ -11,6 +11,8 @@ jobs:
         configuration: [ChinaServer]
     steps:
       - uses: actions/checkout@v2
+        with:
+          path: R3nzSkin  # 限定只获取 R3nzSkin 目录下的文件
       - name: Add msbuild to PATH
         uses: microsoft/setup-msbuild@v1.1
       - name: Build
@@ -30,22 +32,29 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: windows
+      - name: Get Latest Release Tag
+        id: get_latest_tag
+        run: echo "::set-output name=tag::$(git describe --tags $(git rev-list --tags --max-count=1))"
+
+      - name: Bump Version
+        id: bump_version
+        run: echo "::set-output name=next_version::$(echo "${{ steps.get_latest_tag.outputs.tag }}" | awk -F. -v OFS=. '{$NF++;print}')"
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
         with:
-          tag_name: v1.0.0  # 设置 Release 的标签名，根据你的需要自行调整
-          release_name: Release v1.0.0  # 设置 Release 的名称，根据你的需要自行调整
+          tag_name: ${{ steps.bump_version.outputs.next_version }}
+          release_name: Release ${{ steps.bump_version.outputs.next_version }}
           draft: false
           prerelease: false
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./hid.dll  # 设置要上传的文件路径，根据之前 build 任务生成的文件路径自行调整
-          asset_name: hid.dll  # 设置上传后的文件名，根据你的需要自行调整
+          asset_path: ./R3nzSkin.dll  # 设置要上传的文件路径，根据之前 build 任务生成的文件路径自行调整
+          asset_name: R3nzSkin.dll  # 设置上传后的文件名，根据你的需要自行调整
           asset_content_type: application/octet-stream
