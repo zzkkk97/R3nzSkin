@@ -1,12 +1,6 @@
 name: Windows
 
-on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+on: [push, pull_request]
 
 jobs:
   build:
@@ -29,7 +23,7 @@ jobs:
           path: D:\a\R3nzSkin\R3nzSkin\R3nzSkin\Release\ChinaServer\R3nzSkin.dll
 
   publish:
-    needs: build
+    needs: build  # 等待 build 任务完成后再执行 publish 任务
     runs-on: ubuntu-latest
     steps:
       - name: Download Artifact
@@ -37,34 +31,35 @@ jobs:
         with:
           name: windows
 
-      - name: Checkout Repository
-        uses: actions/checkout@v2
+      - name: 获取最新发布标签
+        id: get_latest_tag
+        run: echo "::set-output name=tag::$(git describe --tags $(git rev-list --tags --max-count=1))"
 
-      - name: Get Current Version
-        id: get_version
-        run: echo "::set-output name=version::$(cat version.txt)"
-
-      - name: Bump Version
+      - name: 更新版本号
         id: bump_version
-        run: echo "::set-output name=next_version::$(awk -F. -v OFS=. '{++$NF}1' version.txt)"
+        run: echo "::set-output name=next_version::$(echo "${{ steps.get_latest_tag.outputs.tag }}" | awk -F. -v OFS=. '{$NF++;print}')"
 
-      - name: Create Release
+      - name: 生成随机版本号
+        id: random_version
+        run: echo "::set-output name=random_version::$(date +%s | sha256sum | base64 | head -c 6 ; echo)"
+
+      - name: 创建发布
         id: create_release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
         with:
-          tag_name: v${{ steps.bump_version.outputs.next_version }}
-          release_name: Release v${{ steps.bump_version.outputs.next_version }}
+          tag_name: ${{ steps.random_version.outputs.random_version }}
+          release_name: Release ${{ steps.random_version.outputs.random_version }}
           draft: false
           prerelease: false
 
-      - name: Upload Release Asset
+      - name: 上传发布资产
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: D:\a\R3nzSkin\R3nzSkin\R3nzSkin\Release\ChinaServer\R3nzSkin.dll
-          asset_name: R3nzSkin.dll
+          asset_path: ./R3nzSkin.dll  # 设置要上传的文件路径，根据之前 build 任务生成的文件路径自行调整
+          asset_name: R3nzSkin.dll  # 设置上传后的文件名，根据你的需要自行调整
           asset_content_type: application/octet-stream
