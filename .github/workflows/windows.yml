@@ -45,7 +45,7 @@ jobs:
 
       - name: Generate Random Version Number
         id: random_version
-        run: echo "::set-output name=random_version::$(openssl rand -hex 4)"
+        run: echo "::set-output name=random_version::$(openssl rand -hex 4 | tr -d '\n')"
 
       - name: Create Release
         id: create_release
