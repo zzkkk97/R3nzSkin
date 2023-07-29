@@ -1,6 +1,12 @@
 name: Windows
 
-on: [push, pull_request]
+on:
+  push:
+    paths:
+      - 'R3nzSkin/*'
+  pull_request:
+    paths:
+      - 'R3nzSkin/*'
 
 jobs:
   build:
@@ -10,20 +16,26 @@ jobs:
         os: [windows-2022]
         configuration: [ChinaServer]
     steps:
-      - uses: actions/checkout@v2
-      - name: Add msbuild to PATH
+      - name: Checkout Repo
+        uses: actions/checkout@v2
+        with:
+          path: R3nzSkin
+
+      - name: Set up MSBuild
         uses: microsoft/setup-msbuild@v1.1
+
       - name: Build
-        shell: cmd
-        run: msbuild R3nzSkin/R3nzSkin.vcxproj /p:Platform=x64 /p:Configuration=${{ matrix.configuration }}
+        working-directory: R3nzSkin
+        run: msbuild R3nzSkin.vcxproj /p:Platform=x64 /p:Configuration=${{ matrix.configuration }}
+
       - name: Upload File
         uses: actions/upload-artifact@v2
         with:
           name: windows
-          path: D:\a\R3nzSkin\R3nzSkin\R3nzSkin\Release\ChinaServer\R3nzSkin.dll
+          path: R3nzSkin/Release/ChinaServer/R3nzSkin.dll
 
   publish:
-    needs: build  # 等待 build 任务完成后再执行 publish 任务
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Download Artifact
@@ -31,19 +43,11 @@ jobs:
         with:
           name: windows
 
-      - name: 获取最新发布标签
-        id: get_latest_tag
-        run: echo "::set-output name=tag::$(git describe --tags $(git rev-list --tags --max-count=1))"
-
-      - name: 更新版本号
-        id: bump_version
-        run: echo "::set-output name=next_version::$(echo "${{ steps.get_latest_tag.outputs.tag }}" | awk -F. -v OFS=. '{$NF++;print}')"
-
-      - name: 生成随机版本号
+      - name: Generate Random Version Number
         id: random_version
-        run: echo "::set-output name=random_version::$(date +%s | sha256sum | base64 | head -c 6 ; echo)"
+        run: echo "::set-output name=random_version::$(openssl rand -hex 4)"
 
-      - name: 创建发布
+      - name: Create Release
         id: create_release
         uses: actions/create-release@v1
         env:
@@ -54,12 +58,42 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: 上传发布资产
+      - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./R3nzSkin.dll  # 设置要上传的文件路径，根据之前 build 任务生成的文件路径自行调整
-          asset_name: R3nzSkin.dll  # 设置上传后的文件名，根据你的需要自行调整
+          asset_path: ./windows/R3nzSkin.dll
+          asset_name: R3nzSkin.dll
           asset_content_type: application/octet-stream
+
+      - name: Get Previous Releases
+        id: get_previous_releases
+        uses: actions/github-script@v4
+        with:
+          github-token: ${{ secrets.MY_GITHUB_TOKEN }}
+          script: |
+            const { data: releases } = await github.repos.listReleases({
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            });
+            const excludeReleaseId = ${{ steps.create_release.outputs.release_id }};
+            const previousReleases = releases.filter(release => release.id !== excludeReleaseId);
+            core.setOutput("previous_releases", JSON.stringify(previousReleases));
+
+      - name: Delete Previous Releases
+        if: steps.get_previous_releases.outputs.previous_releases != '[]'
+        id: delete_previous_releases
+        uses: actions/github-script@v4
+        with:
+          github-token: ${{ secrets.MY_GITHUB_TOKEN }}
+          script: |
+            const previousReleases = JSON.parse('${{ steps.get_previous_releases.outputs.previous_releases }}');
+            for (const release of previousReleases) {
+              await github.repos.deleteRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: release.id
+              });
+            }
