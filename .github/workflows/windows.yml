@@ -21,6 +21,7 @@ jobs:
     - name: Add msbuild to PATH
       uses: microsoft/setup-msbuild@v1.1
     - name: Build
+      id: build
       shell: cmd
       run: msbuild R3nzSkin/R3nzSkin.vcxproj /p:Platform=x64 /p:Configuration=${{ matrix.configuration }}
     - name: Upload File
@@ -29,4 +30,48 @@ jobs:
         name: windows
         path: D:\a\R3nzSkin\R3nzSkin\R3nzSkin\Release\ChinaServer\R3nzSkin.dll
 
-  # 其他任务...
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[ci skip]') == false && contains(github.event_path, 'README.md') }}
+    steps:
+    - name: Download Artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: windows
+
+    - name: 获取最新发布标签
+      id: get_latest_tag
+      run: echo "::set-output name=tag::$(git describe --tags $(git rev-list --tags --max-count=1))"
+
+    - name: 生成随机版本号
+      id: random_version
+      run: echo "::set-output name=random_version::$(head /dev/urandom | LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)"
+
+    - name: 创建发布
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.random_version.outputs.random_version }}
+        release_name: Release ${{ steps.random_version.outputs.random_version }}
+        draft: false
+        prerelease: false
+
+    - name: 上传发布资产
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./R3nzSkin.dll
+        asset_name: R3nzSkin.dll
+        asset_content_type: application/octet-stream
+
+    - name: 删除之前的发布
+      run: |
+        if [ "$(git tag -l)" ]; then
+          git push origin --delete $(git tag -l)
+          git tag -d $(git tag -l)
+        fi
