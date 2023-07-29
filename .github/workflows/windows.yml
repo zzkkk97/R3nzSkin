@@ -1,11 +1,6 @@
 name: Windows
 
-on:
-  push:
-    branches:
-      - main
-  pull_request:
-    types: [opened, synchronize, reopened, closed, pull_request_target]
+on: [push, pull_request]
 
 jobs:
   build:
@@ -15,61 +10,34 @@ jobs:
         os: [windows-2022]
         configuration: [ChinaServer]
     steps:
-      # 步骤1：代码检查和构建
       - uses: actions/checkout@v2
-      - name: Add msbuild to PATH
-        uses: microsoft/setup-msbuild@v1.1
-      - name: Build
-        shell: cmd
-        run: msbuild R3nzSkin/R3nzSkin.vcxproj /p:Platform=x64 /p:Configuration=${{ matrix.configuration }}
-      - name: Upload File
-        uses: actions/upload-artifact@v2
-        with:
-          name: windows
-          path: D:\a\R3nzSkin\R3nzSkin\R3nzSkin\Release\ChinaServer\R3nzSkin.dll
 
   publish:
     needs: build
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'push' && contains(github.ref, 'refs/tags/') == false }}
+    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[ci skip]') == false && contains(github.event_path, 'README.md') }}
     steps:
-      # 步骤2：下载构建产物
-      - name: Download Artifact
-        uses: actions/download-artifact@v2
-        with:
-          name: windows
-
-      # 步骤3：生成随机版本号
-      - name: 生成随机版本号
-        id: random_version
-        run: echo "::set-output name=random_version::$(head /dev/urandom | LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)"
-
-      # 步骤4：创建发布
-      - name: 创建发布
+      - name: Download README.md
+        run: |
+          echo "Downloading README.md from the root directory..."
+          curl -o README.md -L ${{ github.event.repository.url }}/raw/main/README.md
+      - name: Create Release
         id: create_release
         uses: actions/create-release@v1
+        env:
+          MY_GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
         with:
-          tag_name: ${{ steps.random_version.outputs.random_version }}
-          release_name: Release ${{ steps.random_version.outputs.random_version }}
+          tag_name: ${{ github.sha }}
+          release_name: Release ${{ github.sha }}
           draft: false
           prerelease: false
-          token: ${{ secrets.MY_GITHUB_TOKEN }}
 
-      # 步骤5：上传发布资产
-      - name: 上传发布资产
+      - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
+        env:
+          MY_GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ github.workspace }}/windows/R3nzSkin.dll
-          asset_name: R3nzSkin.dll
-          asset_content_type: application/octet-stream
-          token: ${{ secrets.MY_GITHUB_TOKEN }}
-
-      # 步骤6：删除之前的发布
-      - name: 删除之前的发布
-        run: |
-          releases=$(curl -s -H "Authorization: token ${{ secrets.MY_GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases)
-          for release in $(echo "${releases}" | jq -r '.[].id'); do
-            echo "Deleting release ID: ${release}"
-            curl -X DELETE -H "Authorization: token ${{ secrets.MY_GITHUB_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/releases/${release}"
-          done
+          asset_path: ./README.md
+          asset_name: README.md
+          asset_content_type: text/plain
