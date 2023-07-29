@@ -23,20 +23,32 @@ jobs:
           path: D:\a\R3nzSkin\R3nzSkin\R3nzSkin\Release\ChinaServer\R3nzSkin.dll
 
   publish:
-    needs: build  # 等待 build 任务完成后再执行 publish 任务
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Download Artifact
         uses: actions/download-artifact@v2
         with:
           name: windows
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.x  # 选择一个合适的 Python 3 版本
+      - name: Install bumpversion
+        run: pip install bumpversion
+
       - name: Get Latest Release Tag
         id: get_latest_tag
         run: echo "::set-output name=tag::$(git describe --tags $(git rev-list --tags --max-count=1))"
 
       - name: Bump Version
         id: bump_version
-        run: echo "::set-output name=next_version::$(echo "${{ steps.get_latest_tag.outputs.tag }}" | awk -F. -v OFS=. '{$NF++;print}')"
+        run: |
+          # 使用 bumpversion 工具递增版本号
+          bumpversion minor  # 根据你的版本号规则，你可以改为 'patch' 或 'major'
+          # 将新的版本号保存为输出变量
+          echo "::set-output name=next_version::$(git describe --tags $(git rev-list --tags --max-count=1))"
+
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -47,12 +59,13 @@ jobs:
           release_name: Release ${{ steps.bump_version.outputs.next_version }}
           draft: false
           prerelease: false
+
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./R3nzSkin.dll  # 设置要上传的文件路径，根据之前 build 任务生成的文件路径自行调整
-          asset_name: R3nzSkin.dll  # 设置上传后的文件名，根据你的需要自行调整
+          asset_path: ./R3nzSkin.dll
+          asset_name: R3nzSkin.dll
           asset_content_type: application/octet-stream
