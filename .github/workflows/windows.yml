@@ -2,8 +2,12 @@ name: Windows
 
 on:
   push:
-    paths:
-      - '/'  # 匹配根目录及其所有内容
+    branches:
+      - main  # 仅在 main 分支上触发工作流程
+
+  pull_request:
+    types: [opened, synchronize, reopened, closed, pull_request_target]
+
 jobs:
   build:
     runs-on: ${{ matrix.os }}
@@ -27,6 +31,7 @@ jobs:
   publish:
     needs: build
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'release' }}  # 仅在发布 Release 时运行该任务
     steps:
       - name: Download Artifact
         uses: actions/download-artifact@v2
