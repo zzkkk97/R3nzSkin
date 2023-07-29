@@ -10,14 +10,42 @@ jobs:
         os: [windows-2022]
         configuration: [ChinaServer]
     steps:
-    - uses: actions/checkout@v2
-    - name: Add msbuild to PATH
-      uses: microsoft/setup-msbuild@v1.1
-    - name: Build
-      shell: cmd
-      run: msbuild R3nzSkin/R3nzSkin.vcxproj /p:Platform=x64 /p:Configuration=${{ matrix.configuration }}
-    - name: Upload File
-      uses: actions/upload-artifact@v2
-      with:
-        name: windows
-        path: D:\a\R3nzSkin\R3nzSkin\R3nzSkin\Release\ChinaServer\R3nzSkin.dll
+      - uses: actions/checkout@v2
+      - name: Add msbuild to PATH
+        uses: microsoft/setup-msbuild@v1.1
+      - name: Build
+        shell: cmd
+        run: msbuild R3nzSkin/R3nzSkin.vcxproj /p:Platform=x64 /p:Configuration=${{ matrix.configuration }}
+      - name: Upload File
+        uses: actions/upload-artifact@v2
+        with:
+          name: windows
+          path: D:\a\R3nzSkin\R3nzSkin\R3nzSkin\Release\ChinaServer\R3nzSkin.dll
+
+  publish:
+    needs: build  # 等待 build 任务完成后再执行 publish 任务
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: windows
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v1.0.0  # 设置 Release 的标签名，根据你的需要自行调整
+          release_name: Release v1.0.0  # 设置 Release 的名称，根据你的需要自行调整
+          draft: false
+          prerelease: false
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./hid.dll  # 设置要上传的文件路径，根据之前 build 任务生成的文件路径自行调整
+          asset_name: hid.dll  # 设置上传后的文件名，根据你的需要自行调整
+          asset_content_type: application/octet-stream
