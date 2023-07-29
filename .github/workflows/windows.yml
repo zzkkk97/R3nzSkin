@@ -40,7 +40,7 @@ jobs:
   publish:
     needs: build
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[ci skip]') == false && contains(github.event_path, 'README.md') }}
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.head.sha, github.event.pull_request.base.sha) == false) && contains(github.event_path, 'README.md') }}
     steps:
     - name: Download Artifact
       uses: actions/download-artifact@v2
