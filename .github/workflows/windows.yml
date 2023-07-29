@@ -11,8 +11,6 @@ jobs:
         configuration: [ChinaServer]
     steps:
       - uses: actions/checkout@v2
-        with:
-          path: R3nzSkin  # 限定只获取 R3nzSkin 目录下的文件
       - name: Add msbuild to PATH
         uses: microsoft/setup-msbuild@v1.1
       - name: Build
