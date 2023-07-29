@@ -40,6 +40,7 @@ jobs:
           latest_tag=$(git describe --tags $(git rev-list --tags --max-count=1))
           # 提取版本号
           version=${latest_tag#v}  # 去除前缀 'v' 得到版本号
+          # 解析版本号中的主版本号、次版本号和修订版本号
           major=$(echo "$version" | cut -d "." -f 1)
           minor=$(echo "$version" | cut -d "." -f 2)
           patch=$(echo "$version" | cut -d "." -f 3)
@@ -48,7 +49,7 @@ jobs:
           # 生成新版本号并输出
           new_version="r3 v${major}.${minor}.${patch}"
           echo "::set-output name=next_version::$new_version"
-          
+
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -56,9 +57,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
         with:
           tag_name: ${{ steps.bump_version.outputs.next_version }}
-          release_name: ${{ steps.bump_version.outputs.next_version }}  # 使用版本号作为发布名称
+          release_name: R3 ${{ steps.bump_version.outputs.next_version }}  # 发布名称：R3 版本号
           draft: false
           prerelease: false
+
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
         env:
