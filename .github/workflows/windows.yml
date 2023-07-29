@@ -69,3 +69,4 @@ jobs:
           asset_path: ./R3nzSkin.dll  # 设置要上传的文件路径，根据之前 build 任务生成的文件路径自行调整
           asset_name: R3nzSkin.dll  # 设置上传后的文件名，根据你的需要自行调整
           asset_content_type: application/octet-stream
+        
