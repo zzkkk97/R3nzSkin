@@ -4,9 +4,6 @@ on:
   push:
     paths:
       - '/'  # 匹配根目录及其所有内容
-  pull_request:
-    types: [opened, synchronize, reopened, closed, pull_request_target]
-
 jobs:
   build:
     runs-on: ${{ matrix.os }}
