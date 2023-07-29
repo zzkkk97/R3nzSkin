@@ -10,7 +10,7 @@ jobs:
         os: [windows-2022]
         configuration: [ChinaServer]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2  # 添加这一步，将代码仓库检出到工作目录
       - name: Add msbuild to PATH
         uses: microsoft/setup-msbuild@v1.1
       - name: Build
@@ -26,14 +26,11 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Download Artifact
-        uses: actions/download-artifact@v2
-        with:
-          name: windows
+      - uses: actions/checkout@v2  # 添加这一步，将代码仓库检出到工作目录
       - name: Setup Python
         uses: actions/setup-python@v2
         with:
-          python-version: 3.8  # 选择一个合适的 Python 3 版本
+          python-version: 3.x  # 选择一个合适的 Python 3 版本
       - name: Install bumpversion
         run: pip install bumpversion
 
