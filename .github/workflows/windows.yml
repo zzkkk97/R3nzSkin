@@ -36,7 +36,20 @@ jobs:
 
       - name: Bump Version
         id: bump_version
-        run: echo "::set-output name=next_version::$(echo "${{ steps.get_latest_tag.outputs.tag }}" | awk -F. -v OFS=. '{$NF++;print}')"
+        run: |
+          # 获取最新的 Release 标签
+          latest_tag=$(git describe --tags $(git rev-list --tags --max-count=1))
+          # 提取版本号
+          version=$(echo "$latest_tag" | cut -d "v" -f 2)
+          # 拆分版本号为主版本号、次版本号和修订版本号
+          major=$(echo "$version" | cut -d "." -f 1)
+          minor=$(echo "$version" | cut -d "." -f 2)
+          patch=$(echo "$version" | cut -d "." -f 3)
+          # 每次更新将修订版本号加上 1
+          patch=$((patch + 1))
+          # 生成新版本号并输出
+          new_version="r3 v${major}.${minor}.${patch}"
+          echo "::set-output name=next_version::$new_version"
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -44,7 +57,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
         with:
           tag_name: ${{ steps.bump_version.outputs.next_version }}
-          release_name: Release ${{ steps.bump_version.outputs.next_version }}
+          release_name: ${{ steps.bump_version.outputs.next_version }}  # 使用版本号作为发布名称
           draft: false
           prerelease: false
       - name: Upload Release Asset
