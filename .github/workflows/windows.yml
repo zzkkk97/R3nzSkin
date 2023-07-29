@@ -48,13 +48,13 @@ jobs:
       - name: 创建发布
         id: create_release
         uses: actions/create-release@v1
-        env:
-          MY_GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
         with:
           tag_name: ${{ steps.random_version.outputs.random_version }}
           release_name: Release ${{ steps.random_version.outputs.random_version }}
           draft: false
           prerelease: false
+        env:
+          MY_GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
 
       # 步骤5：上传发布资产
       - name: 上传发布资产
