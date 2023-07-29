@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'README.md'  # 限制只有在根目录下的 README.md 文件发生变化时触发工作流程
   pull_request:
     types: [opened, synchronize, reopened, closed, pull_request_target]
 
@@ -17,58 +15,63 @@ jobs:
         os: [windows-2022]
         configuration: [ChinaServer]
     steps:
-    - uses: actions/checkout@v2
-    - name: Add msbuild to PATH
-      uses: microsoft/setup-msbuild@v1.1
-    - name: Build
-      shell: cmd
-      run: msbuild R3nzSkin/R3nzSkin.vcxproj /p:Platform=x64 /p:Configuration=${{ matrix.configuration }}
-    - name: Upload File
-      uses: actions/upload-artifact@v2
-      with:
-        name: windows
-        path: D:\a\R3nzSkin\R3nzSkin\R3nzSkin\Release\ChinaServer\R3nzSkin.dll
-
-    # Set the artifact path as an environment variable
-    - name: Set Artifact Path
-      id: set_artifact_path
-      run: echo "ARTIFACT_PATH=D:\\a\\R3nzSkin\\R3nzSkin\\R3nzSkin\\Release\\ChinaServer\\R3nzSkin.dll" >> $GITHUB_ENV
+      # 步骤1：代码检查和构建
+      - uses: actions/checkout@v2
+      - name: Add msbuild to PATH
+        uses: microsoft/setup-msbuild@v1.1
+      - name: Build
+        shell: cmd
+        run: msbuild R3nzSkin/R3nzSkin.vcxproj /p:Platform=x64 /p:Configuration=${{ matrix.configuration }}
+      - name: Upload File
+        uses: actions/upload-artifact@v2
+        with:
+          name: windows
+          path: D:\a\R3nzSkin\R3nzSkin\R3nzSkin\Release\ChinaServer\R3nzSkin.dll
 
   publish:
     needs: build
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.head.sha, github.event.pull_request.base.sha) == false) && contains(github.event_path, 'README.md') }}
+    if: ${{ github.event_name == 'push' && contains(github.ref, 'refs/tags/') == false }}
     steps:
-    - name: Download Artifact
-      uses: actions/download-artifact@v2
-      with:
-        name: windows
+      # 步骤2：下载构建产物
+      - name: Download Artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: windows
 
-    - name: 获取最新发布标签
-      id: get_latest_tag
-      run: echo "::set-output name=tag::$(git describe --tags $(git rev-list --tags --max-count=1))"
+      # 步骤3：生成随机版本号
+      - name: 生成随机版本号
+        id: random_version
+        run: echo "::set-output name=random_version::$(head /dev/urandom | LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)"
 
-    - name: 生成随机版本号
-      id: random_version
-      run: echo "::set-output name=random_version::$(head /dev/urandom | LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)"
+      # 步骤4：创建发布
+      - name: 创建发布
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          MY_GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.random_version.outputs.random_version }}
+          release_name: Release ${{ steps.random_version.outputs.random_version }}
+          draft: false
+          prerelease: false
 
-    - name: 创建发布
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ steps.random_version.outputs.random_version }}
-        release_name: Release ${{ steps.random_version.outputs.random_version }}
-        draft: false
-        prerelease: false
+      # 步骤5：上传发布资产
+      - name: 上传发布资产
+        uses: actions/upload-release-asset@v1
+        env:
+          MY_GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ github.workspace }}/D:\a\R3nzSkin\R3nzSkin\R3nzSkin\Release\ChinaServer\R3nzSkin.dll
+          asset_name: R3nzSkin.dll
+          asset_content_type: application/octet-stream
 
-    - name: 上传发布资产
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ${{ env.ARTIFACT_PATH }}
-        asset_name: R3nzSkin.dll
-        asset_content_type: application/octet-stream
+      # 步骤6：删除之前的发布
+      - name: 删除之前的发布
+        run: |
+          releases=$(curl -s -H "Authorization: token ${{ secrets.MY_GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases)
+          for release in $(echo "${releases}" | jq -r '.[].id'); do
+            echo "Deleting release ID: ${release}"
+            curl -X DELETE -H "Authorization: token ${{ secrets.MY_GITHUB_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/releases/${release}"
+          done
