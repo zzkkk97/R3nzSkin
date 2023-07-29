@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'README.md'  # 限制只有在根目录下的 README.md 文件发生变化时触发工作流程
   pull_request:
     types: [opened, synchronize, reopened, closed, pull_request_target]
 
@@ -19,11 +21,9 @@ jobs:
     - name: Add msbuild to PATH
       uses: microsoft/setup-msbuild@v1.1
     - name: Build
-      if: contains(github.event.head_commit.message, '[ci skip]') == false && contains(github.event_path, 'R3nzSkin/')
       shell: cmd
       run: msbuild R3nzSkin/R3nzSkin.vcxproj /p:Platform=x64 /p:Configuration=${{ matrix.configuration }}
     - name: Upload File
-      if: contains(github.event.head_commit.message, '[ci skip]') == false && contains(github.event_path, 'R3nzSkin/')
       uses: actions/upload-artifact@v2
       with:
         name: windows
