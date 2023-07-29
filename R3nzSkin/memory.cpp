@@ -161,3 +161,4 @@ void Memory::Search(bool gameClient)
 		::MessageBoxA(nullptr, e.what(), "R3nzSkin", MB_OK | MB_ICONWARNING);
 	}
 }
+
