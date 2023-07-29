@@ -67,33 +67,3 @@ jobs:
           asset_path: ./windows/R3nzSkin.dll
           asset_name: R3nzSkin.dll
           asset_content_type: application/octet-stream
-
-      - name: Get Previous Releases
-        id: get_previous_releases
-        uses: actions/github-script@v4
-        with:
-          github-token: ${{ secrets.MY_GITHUB_TOKEN }}
-          script: |
-            const { data: releases } = await github.repos.listReleases({
-              owner: context.repo.owner,
-              repo: context.repo.repo
-            });
-            const excludeReleaseId = ${{ steps.create_release.outputs.release_id }};
-            const previousReleases = releases.filter(release => release.id !== excludeReleaseId);
-            core.setOutput("previous_releases", JSON.stringify(previousReleases));
-
-      - name: Delete Previous Releases
-        if: steps.get_previous_releases.outputs.previous_releases != '[]'
-        id: delete_previous_releases
-        uses: actions/github-script@v4
-        with:
-          github-token: ${{ secrets.MY_GITHUB_TOKEN }}
-          script: |
-            const previousReleases = JSON.parse('${{ steps.get_previous_releases.outputs.previous_releases }}');
-            for (const release of previousReleases) {
-              await github.repos.deleteRelease({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                release_id: release.id
-              });
-            }
