@@ -1,6 +1,13 @@
 name: Windows
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '/R3nzSkin/**'  # 限制只有在 R3nzSkin 目录及其子目录下的文件发生变化时才触发工作流程
+  pull_request:
+    types: [opened, synchronize, reopened, closed, pull_request_target]
 
 jobs:
   build:
@@ -14,11 +21,11 @@ jobs:
     - name: Add msbuild to PATH
       uses: microsoft/setup-msbuild@v1.1
     - name: Build
-      if: ${{ startsWith(github.event_name, 'push') && startsWith(github.path, 'R3nzSkin/') }}
+      if: contains(github.event.head_commit.message, '[ci skip]') == false
       shell: cmd
       run: msbuild R3nzSkin/R3nzSkin.vcxproj /p:Platform=x64 /p:Configuration=${{ matrix.configuration }}
     - name: Upload File
-      if: ${{ startsWith(github.event_name, 'push') && startsWith(github.path, 'R3nzSkin/') }}
+      if: contains(github.event.head_commit.message, '[ci skip]') == false
       uses: actions/upload-artifact@v2
       with:
         name: windows
