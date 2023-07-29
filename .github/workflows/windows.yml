@@ -22,7 +22,9 @@ jobs:
       - name: Build
         shell: cmd
         run: msbuild R3nzSkin/R3nzSkin.vcxproj /p:Platform=x64 /p:Configuration=${{ matrix.configuration }}
+      # 添加if条件，仅当不是发布事件时才上传构建产物
       - name: Upload File
+        if: ${{ github.event_name != 'release' }}
         uses: actions/upload-artifact@v2
         with:
           name: windows
@@ -47,7 +49,7 @@ jobs:
 
       - name: 生成随机版本号
         id: random_version
-        run: echo "::set-output name=random_version::$(date +%s | sha256sum | base64 | head -c 6 ; echo)"
+        run: echo "::set-output name=random_version::$(date +%s | sha256sum | base64 | head -c 8 ; echo)"
 
       - name: 创建发布
         id: create_release
@@ -69,4 +71,3 @@ jobs:
           asset_path: ./R3nzSkin.dll  # 设置要上传的文件路径，根据之前 build 任务生成的文件路径自行调整
           asset_name: R3nzSkin.dll  # 设置上传后的文件名，根据你的需要自行调整
           asset_content_type: application/octet-stream
-        
