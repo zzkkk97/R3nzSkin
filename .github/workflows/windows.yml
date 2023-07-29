@@ -23,7 +23,7 @@ jobs:
           path: D:\a\R3nzSkin\R3nzSkin\R3nzSkin\Release\ChinaServer\R3nzSkin.dll
 
   publish:
-    needs: build  # 等待 build 任务完成后再执行 publish 任务
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Download Artifact
@@ -34,6 +34,9 @@ jobs:
         id: get_latest_tag
         run: echo "::set-output name=tag::$(git describe --tags $(git rev-list --tags --max-count=1))"
 
+      - name: Output Next Version
+        run: echo "Next Version: ${{ steps.get_latest_tag.outputs.tag }}"
+
       - name: Bump Version
         id: bump_version
         run: echo "::set-output name=next_version::$(echo "${{ steps.get_latest_tag.outputs.tag }}" | awk -F. -v OFS=. '{$NF++;print}')"
@@ -43,7 +46,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
         with:
-          tag_name: ${{ steps.bump_version.outputs.next_version }}
+          tag_name: ${{ steps.get_latest_tag.outputs.tag }}  # 使用 get_latest_tag 步骤输出的标签名称
           release_name: Release ${{ steps.bump_version.outputs.next_version }}
           draft: false
           prerelease: false
@@ -53,6 +56,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./R3nzSkin.dll  # 设置要上传的文件路径，根据之前 build 任务生成的文件路径自行调整
-          asset_name: R3nzSkin.dll  # 设置上传后的文件名，根据你的需要自行调整
+          asset_path: ./R3nzSkin.dll
+          asset_name: R3nzSkin.dll
           asset_content_type: application/octet-stream
