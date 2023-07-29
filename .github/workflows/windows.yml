@@ -37,16 +37,25 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - name: Delete Previous Releases
+        run: |
+          releases=$(curl -s -H "Authorization: token ${{ secrets.MY_GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases)
+          for release in $(echo "${releases}" | jq -r '.[].id'); do
+            echo "Deleting release ID: ${release}"
+            curl -X DELETE -H "Authorization: token ${{ secrets.MY_GITHUB_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/releases/${release}"
+          done
+        # 步骤5：删除之前的全部发布，只保留最新的发布
+
       - name: Download Artifact
         uses: actions/download-artifact@v2
         with:
           name: windows
-        # 步骤5：下载构建产物 R3nzSkin.dll
+        # 步骤6：下载构建产物 R3nzSkin.dll
 
       - name: Generate Random Version Number
         id: random_version
         run: echo "::set-output name=random_version::$(openssl rand -hex 4 | tr -d '\n')"
-        # 步骤6：生成随机版本号，保存为输出参数 random_version
+        # 步骤7：生成随机版本号，保存为输出参数 random_version
 
       - name: Create Release
         id: create_release
@@ -58,7 +67,7 @@ jobs:
           release_name: Release ${{ steps.random_version.outputs.random_version }}
           draft: false
           prerelease: false
-        # 步骤7：创建新的发布，使用随机版本号作为标签和发布名称
+        # 步骤8：创建新的发布，使用随机版本号作为标签和发布名称
 
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
@@ -69,13 +78,4 @@ jobs:
           asset_path: ./R3nzSkin.dll
           asset_name: R3nzSkin.dll
           asset_content_type: application/octet-stream
-        # 步骤8：将编译生成的 R3nzSkin.dll 文件上传到发布中作为资产
-
-      - name: Delete Previous Releases
-        run: |
-          releases=$(curl -s -H "Authorization: token ${{ secrets.MY_GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases)
-          for release in $(echo "${releases}" | jq -r '.[].id'); do
-            echo "Deleting release ID: ${release}"
-            curl -X DELETE -H "Authorization: token ${{ secrets.MY_GITHUB_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/releases/${release}"
-          done
-        # 步骤9：删除之前的全部发布，只保留最新的发布
+        # 步骤9：将编译生成的 R3nzSkin.dll 文件上传到发布中作为资产
