@@ -7,7 +7,8 @@ on:
       - main
     # 限制只有在根目录下的 R3nzSkin/memory.hpp 文件发生变化时触发工作流程
     paths:
-      - 'R3nzSkin/memory.hpp'
+      #- 'R3nzSkin/memory.hpp'
+      - 'Up'
   pull_request:
     types: [opened, synchronize, reopened, closed, pull_request_target]
 
