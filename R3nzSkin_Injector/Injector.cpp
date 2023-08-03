@@ -5,12 +5,20 @@
 #include <string>
 #include <thread>
 #include <tlhelp32.h>
+#include <regex>
+#include <msclr/marshal_cppstd.h>
 
 #include "Injector.hpp"
 #include "R3nzUI.hpp"
 #include "lazy_importer.hpp"
 
-proclist_t WINAPI Injector::findProcesses(const std::wstring name) noexcept
+using namespace System;
+using namespace System::Windows::Forms;
+using namespace System::Threading;
+using namespace System::Globalization;
+using namespace System::Net;
+
+proclist_t WINAPI Injector::findProcesses(const std::wstring& name) noexcept
 {
 	auto process_snap{ LI_FN(CreateToolhelp32Snapshot)(TH32CS_SNAPPROCESS, 0) };
 	proclist_t list;
@@ -39,7 +47,7 @@ bool WINAPI Injector::isInjected(const std::uint32_t pid) noexcept
 {
 	auto hProcess{ LI_FN(OpenProcess)(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pid) };
 
-	if (NULL == hProcess)
+	if (nullptr == hProcess)
 		return false;
 
 	HMODULE hMods[1024];
@@ -83,8 +91,8 @@ bool WINAPI Injector::inject(const std::uint32_t pid) noexcept
 
 	const auto dll_path{ std::wstring(current_dir) + L"\\R3nzSkin.dll" };
 
-	if (auto f{ std::ifstream(dll_path) }; !f.is_open()) {
-		LI_FN(MessageBox)(nullptr, L"R3nzSkin.dll file could not be found.\nTry reinstalling the cheat.", L"R3nzSkin", MB_ICONERROR | MB_OK);
+	if (const auto f{ std::ifstream(dll_path) }; !f.is_open()) {
+		LI_FN(MessageBoxW)(nullptr, L"R3nzSkin.dll file could not be found.\nTry reinstalling the cheat.", L"R3nzSkin", MB_ICONERROR | MB_OK);
 		LI_FN(CloseHandle)(handle);
 		return false;
 	}
@@ -103,7 +111,7 @@ bool WINAPI Injector::inject(const std::uint32_t pid) noexcept
 	}
 
 	HANDLE thread{};
-	LI_FN(NtCreateThreadEx).nt_cached()(&thread, GENERIC_ALL, NULL, handle, reinterpret_cast<LPTHREAD_START_ROUTINE>(LI_FN(GetProcAddress).get()(LI_FN(GetModuleHandleW).get()(L"kernel32.dll"), "LoadLibraryW")), dll_path_remote, FALSE, NULL, NULL, NULL, NULL);
+	LI_FN(NtCreateThreadEx).nt_cached()(&thread, GENERIC_ALL, nullptr, handle, reinterpret_cast<LPTHREAD_START_ROUTINE>(LI_FN(GetProcAddress).get()(LI_FN(GetModuleHandleW).get()(L"kernel32.dll"), "LoadLibraryW")), dll_path_remote, FALSE, NULL, NULL, NULL, NULL);
 
 	if (!thread || thread == INVALID_HANDLE_VALUE) {
 		LI_FN(VirtualFreeEx).get()(handle, dll_path_remote, 0u, MEM_RELEASE);
@@ -123,39 +131,86 @@ void WINAPI Injector::enableDebugPrivilege() noexcept
 	HANDLE token{};
 	if (OpenProcessToken(LI_FN(GetCurrentProcess).get()(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &token)) {
 		LUID value;
-		if (LookupPrivilegeValueW(NULL, SE_DEBUG_NAME, &value)) {
+		if (LookupPrivilegeValueW(nullptr, SE_DEBUG_NAME, &value)) {
 			TOKEN_PRIVILEGES tp{};
 			tp.PrivilegeCount = 1;
 			tp.Privileges[0].Luid = value;
 			tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
-			if (AdjustTokenPrivileges(token, FALSE, &tp, sizeof(tp), NULL, NULL))
+			if (AdjustTokenPrivileges(token, FALSE, &tp, sizeof(tp), nullptr, nullptr))
 				LI_FN(CloseHandle)(token);
 		}
 	}
 }
 
-std::string Injector::randomString(std::uint32_t size) noexcept
+void Injector::autoUpdate()
 {
-	static auto& alphanum = "_0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-	std::string tmp_s;
-	tmp_s.reserve(size);
+	WebClient^ client = gcnew WebClient();
+	client->Headers->Add(L"User-Agent", L"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/115.0");
 
-	while(size--)
-		tmp_s += alphanum[std::rand() % (sizeof(alphanum) - 1)];
+	try
+	{
+		std::string json = msclr::interop::marshal_as<std::string>(client->DownloadString(L"https://api.github.com/repos/R3nzTheCodeGOD/R3nzSkin/releases/latest"));
+		std::regex tagnameRegex("\"tag_name\"\\s*:\\s*\"([^\"]+)");
+		std::regex urlRegex("\"browser_download_url\"\\s*:\\s*\"([^\"]+)");
+		std::regex dateRegex("\"created_at\"\\s*:\\s*\"([^\"]+)");
 
-	return tmp_s;
-}
+		std::smatch tagnameMatch, urlMatch, dateMatch;
+		if (std::regex_search(json, tagnameMatch, tagnameRegex))
+		{
+			auto version = gcnew String(tagnameMatch[1].str().c_str());
+			if (std::regex_search(json, dateMatch, dateRegex))
+			{
+				if (!System::IO::File::Exists(L"R3nzSkin.dll"))
+				{
+					throw gcnew Exception(L"Failed to find R3nzSkin.dll in the current directory");
+				}
+				auto date_of_github_release = DateTime::ParseExact(gcnew String(dateMatch[1].str().c_str()), L"yyyy-MM-ddTHH:mm:ssZ", CultureInfo::InvariantCulture).ToString(L"dd.MM.yyyy HH:00");
+				auto date_of_current_release = System::IO::File::GetLastWriteTime(L"R3nzSkin.dll").ToString(L"dd.MM.yyyy HH:00");
+				if (date_of_current_release != date_of_github_release)
+				{
+					auto date_of_github_release_class = DateTime::ParseExact(date_of_github_release, L"dd.MM.yyyy HH:00", CultureInfo::InvariantCulture);
+					auto date_of_current_release_class = DateTime::ParseExact(date_of_current_release, L"dd.MM.yyyy HH:00", CultureInfo::InvariantCulture);
+					if (date_of_current_release_class > date_of_github_release_class)
+					{
+						return;
+					}
 
-void Injector::renameExe() noexcept
-{
-	char szExeFileName[MAX_PATH];
-	LI_FN(GetModuleFileNameA)(nullptr, szExeFileName, MAX_PATH);
+					auto result = MessageBox::Show(L"New version is available on GitHub\nWould you like to download it now?", L"R3nzSkin", MessageBoxButtons::YesNo, MessageBoxIcon::Information);
+					if (result == DialogResult::Yes)
+					{
+						if (std::regex_search(json, urlMatch, urlRegex))
+						{
+							auto url = gcnew String(urlMatch[1].str().c_str());
+							auto file = String::Format(L"R3nzSkin_{0}.zip", version);
+							client->DownloadFile(url, file);
 
-	const auto path{ std::string(szExeFileName) };
-	const auto exe{ path.substr(path.find_last_of("\\") + 1, path.size()) };
-	const auto newName{ randomString(std::rand() % (10 - 7 + 1) + 7) + ".exe" };
-
-	std::rename(exe.c_str(), newName.c_str());
+							System::IO::Compression::ZipFile::ExtractToDirectory(file, L"R3nzSkin");
+							System::IO::File::Delete(file);
+							System::IO::File::Delete(L"R3nzSkin.dll");
+							System::IO::File::Move(L"R3nzSkin\\R3nzSkin_Injector.exe", String::Format(L"R3nzSkin_Injector_{0}.exe", version));
+							System::IO::File::Move(L"R3nzSkin\\R3nzSkin.dll", L"R3nzSkin.dll");
+							System::IO::Directory::Delete(L"R3nzSkin");
+							
+							auto process_info = gcnew System::Diagnostics::ProcessStartInfo();
+							process_info->Arguments = L"/C choice /C Y /N /D Y /T 1 & del \"" + System::Diagnostics::Process::GetCurrentProcess()->MainModule->FileName + L"\"";
+							process_info->CreateNoWindow = true;
+							process_info->FileName = L"cmd.exe";
+							process_info->WindowStyle = System::Diagnostics::ProcessWindowStyle::Hidden;
+							System::Diagnostics::Process::Start(process_info);
+							System::Diagnostics::Process::Start(String::Format(L"R3nzSkin_Injector_{0}.exe", version));
+			
+							Environment::Exit(0);
+						}
+					}
+				}
+			}
+		}
+	}
+	catch (Exception^ e)
+	{
+		MessageBox::Show(e->Message, L"R3nzSkin", MessageBoxButtons::OK, MessageBoxIcon::Error);
+		Environment::Exit(0);
+	}
 }
 
 void Injector::run() noexcept
