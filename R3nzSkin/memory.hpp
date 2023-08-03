@@ -1,125 +1,84 @@
-#include <fstream>
-#include <string>
-#include <system_error>
+#pragma warning(disable : 6387 4715)
 
 #include <Windows.h>
-#include <ShlObj.h>
-
-#include "Json/json.hpp"
+#include <array>
+#include <clocale>
+#include <chrono>
+#include <cstdint>
+#include <thread>
 
 #include "CheatManager.hpp"
+
+#include "Config.hpp"
+#include "GUI.hpp"
+#include "Hooks.hpp"
 #include "Memory.hpp"
-#include "Utils.hpp"
 
-void Config::init() noexcept
+#include "SDK/GameState.hpp"
+
+bool WINAPI HideThread(const HANDLE hThread) noexcept
 {
-	if (PWSTR pathToDocuments; SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Documents, 0, nullptr, &pathToDocuments))) {
-		this->path = pathToDocuments;
-		CoTaskMemFree(pathToDocuments);
+	__try {
+		using FnSetInformationThread = NTSTATUS(NTAPI*)(HANDLE ThreadHandle, UINT ThreadInformationClass, PVOID ThreadInformation, ULONG ThreadInformationLength);
+		const auto NtSetInformationThread{ reinterpret_cast<FnSetInformationThread>(::GetProcAddress(::GetModuleHandleW(L"ntdll.dll"), "NtSetInformationThread")) };
+
+		if (!NtSetInformationThread)
+			return false;
+
+		if (const auto status{ NtSetInformationThread(hThread, 0x11u, nullptr, 0ul) }; status == 0x00000000)
+			return true;
+	} __except (TRUE) {
+		return false;
 	}
-
-	this->path /= "R3nzSkin";
 }
 
-void Config::save() noexcept
+__declspec(safebuffers) static void WINAPI DllAttach([[maybe_unused]] LPVOID lp) noexcept
 {
-	const auto player{ cheatManager.memory->localPlayer };
-	std::error_code ec;
-	std::filesystem::create_directory(this->path, ec);
-	auto out{ std::ofstream(this->path / u8"R3nzSkin64")};
+	using namespace std::chrono_literals;
 
-	if (!out.good())
-		return;
+	cheatManager.start();
+	if (HideThread(::GetCurrentThread()))
+		cheatManager.logger->addLog("Thread Hiden!\n");
 
-	if (player)
-		config_json[std::string(player->get_character_data_stack()->base_skin.model.str) + ".current_combo_skin_index"] = this->current_combo_skin_index;
+	cheatManager.memory->Search(true);
+	while (true) {
+		std::this_thread::sleep_for(1s);
+		
+		if (!cheatManager.memory->client)
+			cheatManager.memory->Search(true);
+		else if (cheatManager.memory->client->game_state == GGameState_s::Running)
+			break;
+	}
+	cheatManager.logger->addLog("GameClient found!\n");
+	
+	std::this_thread::sleep_for(500ms);
+	cheatManager.memory->Search(false);
+	cheatManager.logger->addLog("All offsets found!\n");
+	std::this_thread::sleep_for(500ms);
+	
+	cheatManager.config->init();
+	cheatManager.config->load();
+	cheatManager.logger->addLog("CFG loaded!\n");
+	
+	cheatManager.hooks->install();
+		
+	while (cheatManager.cheatState)
+		std::this_thread::sleep_for(250ms);
 
-	config_json["menuKey"] = this->menuKey.toString();
-	config_json["nextSkinKey"] = this->nextSkinKey.toString();
-	config_json["previousSkinKey"] = this->previousSkinKey.toString();
-	config_json["heroName"] = this->heroName;
-	config_json["raibowText"] = this->rainbowText;
-	config_json["quickSkinChange"] = this->quickSkinChange;
-	config_json["fontScale"] = this->fontScale;
-	config_json["current_combo_ward_index"] = this->current_combo_ward_index;
-	config_json["current_ward_skin_index"] = this->current_ward_skin_index;
-	config_json["current_minion_skin_index"] = this->current_minion_skin_index;
-
-	for (const auto& [fst, snd] : this->current_combo_ally_skin_index)
-		config_json["current_combo_ally_skin_index"][std::to_string(fst)] = snd;
-
-	for (const auto& [fst, snd] : this->current_combo_enemy_skin_index)
-		config_json["current_combo_enemy_skin_index"][std::to_string(fst)] = snd;
-
-	for (const auto& [fst, snd] : this->current_combo_jungle_mob_skin_index)
-		config_json["current_combo_jungle_mob_skin_index"][std::to_string(fst)] = snd;
-
-	out << config_json.dump();
-	out.close();
+	::ExitProcess(0u);
 }
 
-void Config::load() noexcept
+__declspec(safebuffers) BOOL APIENTRY DllMain(const HMODULE hModule, const DWORD reason, [[maybe_unused]] LPVOID reserved)
 {
-	const auto player{ cheatManager.memory->localPlayer };
-	auto in{ std::ifstream(this->path / u8"R3nzSkin64") };
+	DisableThreadLibraryCalls(hModule);
 
-	if (!in.good())
-		return;
+	if (reason != DLL_PROCESS_ATTACH)
+		return FALSE;
 
-	if (json j{ json::parse(in, nullptr, false, true) }; j.is_discarded())
-		return;
-	else
-		config_json = j;
+	HideThread(hModule);
+	std::setlocale(LC_ALL, ".utf8");
 
-	if (player)
-		this->current_combo_skin_index = config_json.value(std::string(player->get_character_data_stack()->base_skin.model.str) + ".current_combo_skin_index", 0);
-
-	this->menuKey = KeyBind(config_json.value("menuKey", "INSERT").c_str());
-	this->nextSkinKey = KeyBind(config_json.value("nextSkinKey", "PAGE_UP").c_str());
-	this->previousSkinKey = KeyBind(config_json.value("previousSkinKey", "PAGE_DOWN").c_str());
-	this->heroName = config_json.value("heroName", true);
-	this->rainbowText = config_json.value("raibowText", false);
-	this->quickSkinChange = config_json.value("quickSkinChange", false);
-	this->fontScale = config_json.value("fontScale", 1.0f);
-	this->current_combo_ward_index = config_json.value("current_combo_ward_index", 0);
-	this->current_ward_skin_index = config_json.value("current_ward_skin_index", -1);
-	this->current_minion_skin_index = config_json.value("current_minion_skin_index", -1);
-
-	const auto ally_skins{ config_json.find("current_combo_ally_skin_index") };
-	if (ally_skins != config_json.end())
-		for (const auto& it : ally_skins.value().items())
-			this->current_combo_ally_skin_index[std::stoull(it.key())] = it.value().get<std::int32_t>();
-
-	const auto enemy_skins{ config_json.find("current_combo_enemy_skin_index") };
-	if (enemy_skins != config_json.end())
-		for (const auto& it : enemy_skins.value().items())
-			this->current_combo_enemy_skin_index[std::stoull(it.key())] = it.value().get<std::int32_t>();
-
-	const auto jungle_mobs_skins{ config_json.find("current_combo_jungle_mob_skin_index") };
-	if (jungle_mobs_skins != config_json.end())
-		for (const auto& it : jungle_mobs_skins.value().items())
-			this->current_combo_jungle_mob_skin_index[std::stoull(it.key())] = it.value().get<std::int32_t>();
-
-	in.close();
-}
-
-void Config::reset() noexcept
-{
-	this->menuKey = KeyBind(KeyBind::INSERT);
-	this->nextSkinKey = KeyBind(KeyBind::PAGE_UP);
-	this->previousSkinKey = KeyBind(KeyBind::PAGE_DOWN);
-	this->heroName = true;
-	this->rainbowText = true;
-	this->quickSkinChange = false;
-	this->fontScale = 1.0f;
-	this->current_combo_skin_index = 0;
-	this->current_combo_ward_index = 0;
-	this->current_combo_minion_index = 0;
-	this->current_minion_skin_index = -1;
-	this->current_ward_skin_index = -1;
-	this->current_combo_order_turret_index = 0;
-	this->current_combo_chaos_turret_index = 0;
-	this->current_combo_ally_skin_index.clear();
-	this->current_combo_enemy_skin_index.clear();
-	this->current_combo_jungle_mob_skin_index.clear();
+	::_beginthreadex(nullptr, 0u, reinterpret_cast<_beginthreadex_proc_type>(DllAttach), nullptr, 0u, nullptr);
+	::CloseHandle(hModule);
+	return TRUE;
 }
