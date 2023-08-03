@@ -1,139 +1,125 @@
-#pragma once
+#include <fstream>
+#include <string>
+#include <system_error>
 
 #include <Windows.h>
-#include <cstdint>
-#include <d3d9.h>
-#include <d3d11.h>
+#include <ShlObj.h>
 
-#include "Offsets.hpp"
+#include "Json/json.hpp"
 
-#include "SDK/AIBaseCommon.hpp"
-#include "SDK/AIHero.hpp"
-#include "SDK/AITurret.hpp"
-#include "SDK/AIMinionClient.hpp"
-#include "SDK/ChampionManager.hpp"
-#include "SDK/GameClient.hpp"
-#include "SDK/ManagerTemplate.hpp"
+#include "CheatManager.hpp"
+#include "Memory.hpp"
+#include "Utils.hpp"
 
-class offset_signature {
-public:
-	std::vector<std::string> pattern;
-	bool sub_base;
-	bool read;
-	bool relative;
-	std::int32_t additional;
-	std::uint64_t* offset;
-};
+void Config::init() noexcept
+{
+	if (PWSTR pathToDocuments; SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Documents, 0, nullptr, &pathToDocuments))) {
+		this->path = pathToDocuments;
+		CoTaskMemFree(pathToDocuments);
+	}
 
-class Memory {
-public:
-	void Search(bool gameClient = true);
+	this->path /= "R3nzSkin";
+}
 
-	std::uintptr_t base;
-	HWND window;
+void Config::save() noexcept
+{
+	const auto player{ cheatManager.memory->localPlayer };
+	std::error_code ec;
+	std::filesystem::create_directory(this->path, ec);
+	auto out{ std::ofstream(this->path / u8"R3nzSkin64")};
 
-	GameClient* client;
-	AIBaseCommon* localPlayer;
-	ManagerTemplate<AIHero>* heroList;
-	ManagerTemplate<AIMinionClient>* minionList;
-	ManagerTemplate<AITurret>* turretList;
-	ChampionManager* championManager;
-	
-	std::uintptr_t materialRegistry;
-	IDirect3DDevice9* d3dDevice;
-	IDXGISwapChain* swapChain;
+	if (!out.good())
+		return;
 
-	using translateString_t = const char* (__fastcall*)(const char*);
+	if (player)
+		config_json[std::string(player->get_character_data_stack()->base_skin.model.str) + ".current_combo_skin_index"] = this->current_combo_skin_index;
 
-	translateString_t translateString;
-private:
-	void update(bool gameClient = true) noexcept;
+	config_json["menuKey"] = this->menuKey.toString();
+	config_json["nextSkinKey"] = this->nextSkinKey.toString();
+	config_json["previousSkinKey"] = this->previousSkinKey.toString();
+	config_json["heroName"] = this->heroName;
+	config_json["raibowText"] = this->rainbowText;
+	config_json["quickSkinChange"] = this->quickSkinChange;
+	config_json["fontScale"] = this->fontScale;
+	config_json["current_combo_ward_index"] = this->current_combo_ward_index;
+	config_json["current_ward_skin_index"] = this->current_ward_skin_index;
+	config_json["current_minion_skin_index"] = this->current_minion_skin_index;
 
-	std::vector<offset_signature> gameClientSig
-	{
-		{
-			{
-				"48 8B 05 ? ? ? ? 8B 58 0C"
-			}, true, false, true, 0, &offsets::global::GameClient
-		}
-	};
+	for (const auto& [fst, snd] : this->current_combo_ally_skin_index)
+		config_json["current_combo_ally_skin_index"][std::to_string(fst)] = snd;
 
-	std::vector<offset_signature> sigs
-	{
-		{
-			{
-				"48 8B 3D ? ? ? ? 48 3B CF"
-			}, true, false, true, 0, &offsets::global::Player
-		},
-		{
-			{
-				"48 8B 05 ? ? ? ? 48 8B 78 08 8B 40 10 4C 8D 3C C7 49 3B FF"
-			}, true, false, true, 0, &offsets::global::ManagerTemplate_AIHero_
-		},
-		{
-			{
-				"48 8B 0D ? ? ? ? 48 69 D0 ? ? 00 00 48 8B 05"
-			}, true, false, true, 0, &offsets::global::ChampionManager
-		},
-		{
-			{
-				"48 89 0D ? ? ? ? 48 8D 05 ? ? ? ? 33 D2"
-			}, true, false, true, 0, &offsets::global::ManagerTemplate_AIMinionClient_
-		},
-		{
-			{
-				"48 89 0D ? ? ? ? 33 C9 48 8D 05 ? ? ? ? 4C 8D 05"
-			}, true, false, true, 0, &offsets::global::ManagerTemplate_AITurret_
-		},
-		{
-			{
-				"48 8B 0D ? ? ? ? FF 15 ? ? ? ? E8 ? ? ? ? 48 8B"
-			}, true, false, true, 0, &offsets::global::Riot__g_window
-		},
-		{
-			{
-				"48 8D 8B ? ? ? ? 48 89 44 24 ? C7 44 24"
-			}, false, true, false, 0, &offsets::AIBaseCommon::CharacterDataStack
-		},
-		{
-			{
-				"40 38 BB ? ? 00 00 0F 85 ? 00 00 00 66 C7 83 ? ? 00 00 00 04 0F 31 48 C1 E2 ? 4C 8D 83 ? ? 00 00 48 0B C2 44 8B CF 48 89 44 ? 38 8B D7 41 ? 01 00 00 00 66 0f 1F 84 00"
-			}, false, true, false, 0, &offsets::AIBaseCommon::SkinId
-		},
-		{
-			{
-				"48 8B 8F ? ? 00 00 45 33 C0 8B D3 48 8B 01 FF 90 ? ? 00 00"
-			}, false, true, false, 0, &offsets::MaterialRegistry::D3DDevice
-		},
-		{
-			{
-				"48 8D BB ? ? ? ? C6 83 ? ? ? ? ? 0F 84"
-			}, false, true, false, 0, &offsets::MaterialRegistry::SwapChain
-		},
-		{
-			{
-				"E8 ? ? ? ? 48 8D 8D ? ? 00 00 E8 ? ? ? ? 48 85 C0"
-			}, true, false, false, 0, &offsets::functions::CharacterDataStack__Push
-		},
-		{
-			{
-				"88 54 24 10 53 55 56 57 41 54 41 55 41 56 41"
-			}, true, false, false, 0, &offsets::functions::CharacterDataStack__Update
-		},
-		{
-			{
-				"E8 ? ? ? ? 8B 57 54"
-			}, true, false, false, 0, &offsets::functions::Riot__Renderer__MaterialRegistry__GetSingletonPtr
-		},
-		{
-			{
-				"E8 ? ? ? ? 0F 57 DB 4C 8B C0 F3 0F 5A DE"
-			}, true, false, false, 0, &offsets::functions::translateString_UNSAFE_DONOTUSE
-		},
-		{
-			{
-				"E8 ? ? ? ? 4C 3B F8 0F 94 C0"
-			}, true, false, false, 0, &offsets::functions::GetGoldRedirectTarget
-		}
-	};
-};
+	for (const auto& [fst, snd] : this->current_combo_enemy_skin_index)
+		config_json["current_combo_enemy_skin_index"][std::to_string(fst)] = snd;
+
+	for (const auto& [fst, snd] : this->current_combo_jungle_mob_skin_index)
+		config_json["current_combo_jungle_mob_skin_index"][std::to_string(fst)] = snd;
+
+	out << config_json.dump();
+	out.close();
+}
+
+void Config::load() noexcept
+{
+	const auto player{ cheatManager.memory->localPlayer };
+	auto in{ std::ifstream(this->path / u8"R3nzSkin64") };
+
+	if (!in.good())
+		return;
+
+	if (json j{ json::parse(in, nullptr, false, true) }; j.is_discarded())
+		return;
+	else
+		config_json = j;
+
+	if (player)
+		this->current_combo_skin_index = config_json.value(std::string(player->get_character_data_stack()->base_skin.model.str) + ".current_combo_skin_index", 0);
+
+	this->menuKey = KeyBind(config_json.value("menuKey", "INSERT").c_str());
+	this->nextSkinKey = KeyBind(config_json.value("nextSkinKey", "PAGE_UP").c_str());
+	this->previousSkinKey = KeyBind(config_json.value("previousSkinKey", "PAGE_DOWN").c_str());
+	this->heroName = config_json.value("heroName", true);
+	this->rainbowText = config_json.value("raibowText", false);
+	this->quickSkinChange = config_json.value("quickSkinChange", false);
+	this->fontScale = config_json.value("fontScale", 1.0f);
+	this->current_combo_ward_index = config_json.value("current_combo_ward_index", 0);
+	this->current_ward_skin_index = config_json.value("current_ward_skin_index", -1);
+	this->current_minion_skin_index = config_json.value("current_minion_skin_index", -1);
+
+	const auto ally_skins{ config_json.find("current_combo_ally_skin_index") };
+	if (ally_skins != config_json.end())
+		for (const auto& it : ally_skins.value().items())
+			this->current_combo_ally_skin_index[std::stoull(it.key())] = it.value().get<std::int32_t>();
+
+	const auto enemy_skins{ config_json.find("current_combo_enemy_skin_index") };
+	if (enemy_skins != config_json.end())
+		for (const auto& it : enemy_skins.value().items())
+			this->current_combo_enemy_skin_index[std::stoull(it.key())] = it.value().get<std::int32_t>();
+
+	const auto jungle_mobs_skins{ config_json.find("current_combo_jungle_mob_skin_index") };
+	if (jungle_mobs_skins != config_json.end())
+		for (const auto& it : jungle_mobs_skins.value().items())
+			this->current_combo_jungle_mob_skin_index[std::stoull(it.key())] = it.value().get<std::int32_t>();
+
+	in.close();
+}
+
+void Config::reset() noexcept
+{
+	this->menuKey = KeyBind(KeyBind::INSERT);
+	this->nextSkinKey = KeyBind(KeyBind::PAGE_UP);
+	this->previousSkinKey = KeyBind(KeyBind::PAGE_DOWN);
+	this->heroName = true;
+	this->rainbowText = true;
+	this->quickSkinChange = false;
+	this->fontScale = 1.0f;
+	this->current_combo_skin_index = 0;
+	this->current_combo_ward_index = 0;
+	this->current_combo_minion_index = 0;
+	this->current_minion_skin_index = -1;
+	this->current_ward_skin_index = -1;
+	this->current_combo_order_turret_index = 0;
+	this->current_combo_chaos_turret_index = 0;
+	this->current_combo_ally_skin_index.clear();
+	this->current_combo_enemy_skin_index.clear();
+	this->current_combo_jungle_mob_skin_index.clear();
+}
