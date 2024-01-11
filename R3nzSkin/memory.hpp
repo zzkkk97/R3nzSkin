@@ -62,12 +62,12 @@ private:
 	{
 		{
 			{
-				"48 8B 3D ? ? ? ? 48 3B CF"
+				"48 8B 05 ? ? ? ? 4C 8B D2 4C 8B C1"
 			}, true, false, true, 0, &offsets::global::Player
 		},
 		{
 			{
-				"48 8B 05 ? ? ? ? 48 8B 78 08 8B 40 10 4C 8D 3C C7 49 3B FF"
+				"48 8B 05 ? ? ? ? 45 33 E4 0F 57 C0"
 			}, true, false, true, 0, &offsets::global::ManagerTemplate_AIHero_
 		},
 		{
@@ -77,7 +77,7 @@ private:
 		},
 		{
 			{
-				"48 8B 0D ? ? ? ? E8 ? ? ? ? E8 ? ? ? ? 48 8B 0D ? ? ? ? E8 ? ? ? ? 48 8B 0D ? ? ? ? E8 ? ? ? ? 33 C9"
+				"48 8B 0D ? ? ? ? E8 ? ? ? ? E8 ? ? ? ? E8 ? ? ? ? 48 8B C8"
 			}, true, false, true, 0, &offsets::global::ManagerTemplate_AIMinionClient_
 		},
 		{
