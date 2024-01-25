@@ -17,7 +17,7 @@ inline static void footer() noexcept
 	static const auto buildText{ "更新日期: "s + __DATE__ + " - " + __TIME__ };
 	ImGui::Separator();
 	ImGui::textUnformattedCentered(buildText.c_str());
-	ImGui::textUnformattedCentered("Copyright (C) 2021-2023 R3nzTheCodeGOD");
+	ImGui::textUnformattedCentered("Copyright (C) 2024 Xhr");
 }
 
 static void changeTurretSkin(const std::int32_t skinId, const std::int32_t team) noexcept
@@ -77,7 +77,7 @@ void GUI::render() noexcept
 		return true;
 	};
 
-	ImGui::Begin("R3nzSkin 汉化版", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_AlwaysAutoResize);
+	ImGui::Begin("R3nzSkin 独家版", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_AlwaysAutoResize);
 	{
 		ImGui::rainbowText();
 		if (ImGui::BeginTabBar("TabBar", ImGuiTabBarFlags_Reorderable | ImGuiTabBarFlags_FittingPolicyScroll | ImGuiTabBarFlags_NoTooltip)) {
