@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "AString.hpp"
+#include "Pad.hpp"
 
 class Skin {
 public:
